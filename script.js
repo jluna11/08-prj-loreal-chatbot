@@ -16,9 +16,57 @@ const messages = [
   {
     role: "system",
     content:
-      "You are a helpful L'Oreal Product Advisor assistant. You only answer questions about L'Oreal products, beauty routines, skincare, haircare, makeup, and beauty recommendations. If a question is unrelated, politely refuse and redirect to L'Oreal or beauty topics.",
+      "You are a helpful L'Oreal Product Advisor assistant. Only answer questions about L'Oreal products, routines, skincare, haircare, makeup, beauty recommendations, and related beauty topics. If a user asks anything unrelated, politely refuse in one short sentence and redirect them to L'Oreal or beauty topics. Example refusal style: 'I can only help with L'Oreal products and beauty-related questions. Would you like a product or routine recommendation?'",
   },
 ];
+
+// Store lightweight conversation context for multi-turn chat
+const conversationState = {
+  userName: "",
+  pastQuestions: [],
+};
+
+// Try to capture the user's name from natural phrases
+function updateUserNameFromMessage(message) {
+  const namePatterns = [
+    /my name is\s+([a-zA-Z][a-zA-Z\-']*)/i,
+    /i am\s+([a-zA-Z][a-zA-Z\-']*)/i,
+    /i'm\s+([a-zA-Z][a-zA-Z\-']*)/i,
+  ];
+
+  for (const pattern of namePatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const detectedName =
+        match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      conversationState.userName = detectedName;
+      break;
+    }
+  }
+}
+
+// Keep a short list of recent user questions for better context
+function updatePastQuestions(message) {
+  conversationState.pastQuestions.push(message);
+  if (conversationState.pastQuestions.length > 8) {
+    conversationState.pastQuestions.shift();
+  }
+}
+
+function buildContextMessage() {
+  const nameText = conversationState.userName
+    ? `User name: ${conversationState.userName}.`
+    : "User name: unknown.";
+
+  const questionsText = conversationState.pastQuestions.length
+    ? `Recent user questions: ${conversationState.pastQuestions.join(" | ")}.`
+    : "Recent user questions: none yet.";
+
+  return {
+    role: "system",
+    content: `${nameText} ${questionsText} Use this context to give natural multi-turn responses while staying on L'Oreal and beauty topics.`,
+  };
+}
 
 // Add a message to the chat UI
 function addMessage(sender, text, cssClass) {
@@ -52,6 +100,10 @@ chatForm.addEventListener("submit", async (e) => {
   addMessage("You", userMessage, "user");
   userInput.value = "";
 
+  // Update context memory from the latest user message
+  updateUserNameFromMessage(userMessage);
+  updatePastQuestions(userMessage);
+
   // Add user message to conversation history
   messages.push({
     role: "user",
@@ -79,7 +131,7 @@ chatForm.addEventListener("submit", async (e) => {
       },
       body: JSON.stringify({
         model: "gpt-4o",
-        messages,
+        messages: [...messages, buildContextMessage()],
       }),
     });
 
