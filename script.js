@@ -3,13 +3,9 @@ const chatForm = document.getElementById("chatForm");
 const userInput = document.getElementById("userInput");
 const chatWindow = document.getElementById("chatWindow");
 
-// Read API key from secrets.js.
-// This supports either: const OPENAI_API_KEY = "..."; OR window.OPENAI_API_KEY = "...";
-const apiKey =
-  typeof OPENAI_API_KEY !== "undefined"
-    ? OPENAI_API_KEY
-    : window.OPENAI_API_KEY;
-const apiUrl = "https://api.openai.com/v1/chat/completions";
+// Replace this with your Cloudflare Worker URL
+// See RESOURCE_cloudflare-worker.js for deployment instructions
+const apiUrl = "https://YOUR_WORKER_NAME.YOUR_USERNAME.workers.dev";
 
 // Keep chat history so the assistant remembers context
 const messages = [
@@ -110,11 +106,11 @@ chatForm.addEventListener("submit", async (e) => {
     content: userMessage,
   });
 
-  // If no key is available, show a clear setup message
-  if (!apiKey) {
+  // Check if Cloudflare Worker URL is configured
+  if (!apiUrl || apiUrl.includes("YOUR_")) {
     addMessage(
       "Chatbot",
-      "Missing API key. Add OPENAI_API_KEY in secrets.js to connect.",
+      "Chatbot not configured. Please set up a Cloudflare Worker with your OpenAI API key. See RESOURCE_cloudflare-worker.js for instructions.",
       "ai",
     );
     return;
@@ -123,14 +119,13 @@ chatForm.addEventListener("submit", async (e) => {
   addMessage("Chatbot", "Thinking...", "ai");
 
   try {
+    // Send message history to Cloudflare Worker
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
         messages: [...messages, buildContextMessage()],
       }),
     });
